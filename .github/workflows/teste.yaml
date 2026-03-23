@@ -1,0 +1,30 @@
+name: Example Summary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gerar dados
+        id: data
+        run: |
+          echo "status=SUCESSO" >> $GITHUB_OUTPUT
+          echo "tempo=42s" >> $GITHUB_OUTPUT
+
+      - name: Criar Summary
+        run: |
+          echo "# 📊 Resultado do Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Status: ${{ steps.data.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tempo de execução: ${{ steps.data.outputs.tempo }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Detalhes" >> $GITHUB_STEP_SUMMARY
+          echo "| Etapa | Resultado |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ✅ OK |" >> $GITHUB_STEP_SUMMARY
