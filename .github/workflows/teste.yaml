@@ -1,30 +1,68 @@
-name: Example Summary
+name: URL Check + Summary
 
 on:
   workflow_dispatch:
+    inputs:
+      url:
+        description: "URL para validar"
+        required: true
+        default: "https://jsonplaceholder.typicode.com/posts/1"
 
 jobs:
-  build:
+  check-url:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Gerar dados
-        id: data
+      - name: Validar URL
+        id: validate
         run: |
-          echo "status=SUCESSO" >> $GITHUB_OUTPUT
-          echo "tempo=42s" >> $GITHUB_OUTPUT
+          URL="${{ github.event.inputs.url }}"
+
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "erro=URL inválida" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "valid=true" >> $GITHUB_OUTPUT
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Fazer request HTTP
+        id: request
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          URL="${{ steps.validate.outputs.url }}"
+
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" "$URL")
+          SIZE=$(wc -c < response.txt)
+
+          echo "status=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "size=$SIZE" >> $GITHUB_OUTPUT
+
+          # pega só os primeiros 500 chars (evita estourar o summary)
+          HEAD_CONTENT=$(head -c 500 response.txt | tr '\n' ' ')
+          echo "preview=$HEAD_CONTENT" >> $GITHUB_OUTPUT
 
       - name: Criar Summary
         run: |
-          echo "# 📊 Resultado do Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "# 🔎 URL Check Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Status: ${{ steps.data.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tempo de execução: ${{ steps.data.outputs.tempo }}" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🌐 URL Informada" >> $GITHUB_STEP_SUMMARY
+          echo "\`${{ github.event.inputs.url }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Detalhes" >> $GITHUB_STEP_SUMMARY
-          echo "| Etapa | Resultado |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ OK |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ steps.validate.outputs.valid }}" != "true" ]]; then
+            echo "❌ URL inválida" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "## 📡 Resultado HTTP" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: **${{ steps.request.outputs.status }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Tamanho: **${{ steps.request.outputs.size }} bytes**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 📄 Preview (até 500 chars)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.request.outputs.preview }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
